@@ -2,7 +2,7 @@ import os
 import asyncio
 import sys
 from dotenv import load_dotenv
-from telegram import Bot
+from telegram import Bot, LinkPreviewOptions
 from google import genai
 from ddgs import DDGS
 
@@ -24,7 +24,7 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def fetch_web_news(query: str) -> str:
-    """Безкоштовно шукає свіжі новини в Інтернеті."""
+    """Безкоштовно шукає свіжі новини в Інтернеті разом із посиланнями."""
     print(f"🔍 Пошук новин в Інтернеті за запитом: '{query}'...")
     results = []
     try:
@@ -32,7 +32,11 @@ def fetch_web_news(query: str) -> str:
             for r in ddgs.text(query, timelimit="d", max_results=5):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
-                results.append(f"- **{title}**: {snippet}")
+                url = r.get("href", "")
+                if url:
+                    results.append(f"- **{title}**: {snippet}\n  Джерело: {url}")
+                else:
+                    results.append(f"- **{title}**: {snippet}")
     except Exception as e:
         print(f"⚠️ Попередження пошуку: {e}")
 
@@ -52,7 +56,7 @@ def get_available_gemini_models():
         return names
     except Exception as e:
         print(f"⚠️ Не вдалося отримати список моделей через API: {e}")
-        return ["gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+        return ["gemma-4-26b-a4b-it", "gemini-flash-latest"]
 
 
 def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
@@ -70,8 +74,10 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
         1. Проста, драйвова мова без складного жаргону. Пояснюй складне через ігри (Minecraft, Roblox) чи приклади.
         2. Кілька кольорових емодзі у заголовку та тексті.
         3. 2-3 цікаві новини/факти.
-        4. Обов'язкове запитання в кінці для підписників.
-        5. До 1200 символів.
+        4. В кінці поста обов'язково додай одне найбільш цікаве посилання на оригінал новини у форматі:
+           🔗 Докладніше: URL
+        5. Обов'язкове запитання в кінці для підписників.
+        6. До 1200 символів.
         """
     else:
         prompt = f"""
@@ -86,8 +92,10 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
         1. Професійний, діловий та лаконічний тон.
         2. Яскравий заголовок з емодзі.
         3. Основні новини у вигляді списку (Bullet Points).
-        4. Короткий висновок або головна думка дня.
-        5. До 1500 символів.
+        4. В кінці поста обов'язково додай перше/найважливіше посилання на джерело у форматі:
+           🔗 Читати детальніше: URL
+        5. Короткий висновок або головна думка дня.
+        6. До 1500 символів.
         """
 
     # Список найбільш стабільних та робочих моделей для даного ключа
@@ -127,13 +135,16 @@ async def run():
     print("⏳ Розпочато процес збору новин та генерації постів...")
     print(f"📌 Налаштовані канали: Kids = '{CHANNEL_KIDS_ID}', Adults = '{CHANNEL_ADULTS_ID}'")
 
+    # Налаштування великого прев'ю посилань
+    preview_config = LinkPreviewOptions(is_disabled=False, prefer_large_media=True)
+
     # 1. Пост для дітей (Канал №1)
     try:
         print("👶 Шукаємо новини та генеруємо пост для дітей (7-14 років)...")
         kids_news = fetch_web_news("artificial intelligence technology gaming news for kids")
         kids_post = generate_post_with_gemini(kids_news, "kids")
         print(f"📤 Відправляємо пост у дитячу групу ({CHANNEL_KIDS_ID})...")
-        await bot.send_message(chat_id=CHANNEL_KIDS_ID, text=kids_post)
+        await bot.send_message(chat_id=CHANNEL_KIDS_ID, text=kids_post, link_preview_options=preview_config)
         print("✅ Пост успішно опубліковано у дитячій групі!")
     except Exception as e:
         print(f"❌ Помилка публікації у дитячий канал: {e}")
@@ -146,7 +157,7 @@ async def run():
         adults_news = fetch_web_news("IT artificial intelligence tech business news")
         adults_post = generate_post_with_gemini(adults_news, "adults")
         print(f"📤 Відправляємо пост у дорослу групу ({CHANNEL_ADULTS_ID})...")
-        await bot.send_message(chat_id=CHANNEL_ADULTS_ID, text=adults_post)
+        await bot.send_message(chat_id=CHANNEL_ADULTS_ID, text=adults_post, link_preview_options=preview_config)
         print("✅ Пост успішно опубліковано у дорослій групі!")
     except Exception as e:
         print(f"❌ Помилка публікації у дорослий канал: {e}")
