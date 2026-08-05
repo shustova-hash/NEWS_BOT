@@ -4,7 +4,7 @@ import sys
 from dotenv import load_dotenv
 from telegram import Bot
 from google import genai
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 # Завантаження змінних оточення
 load_dotenv()
@@ -24,7 +24,7 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def fetch_web_news(query: str) -> str:
-    """Безкоштовно шукає свіжі новини через DuckDuckGo Search API."""
+    """Безкоштовно шукає свіжі новини в Інтернеті."""
     print(f"🔍 Пошук новин в Інтернеті за запитом: '{query}'...")
     results = []
     try:
@@ -37,8 +37,22 @@ def fetch_web_news(query: str) -> str:
         print(f"⚠️ Попередження пошуку: {e}")
 
     if not results:
-        return "Новини у сфері технологій та ШІ за останні 24 години."
+        return "Актуальні новини у сфері цифрових технологій та штучного інтелекту."
     return "\n\n".join(results)
+
+
+def get_available_gemini_models():
+    """Отримує перелік доступних моделей Gemini для даного API ключа."""
+    try:
+        models = list(ai_client.models.list())
+        names = []
+        for m in models:
+            clean_name = m.name.replace("models/", "")
+            names.append(clean_name)
+        return names
+    except Exception as e:
+        print(f"⚠️ Не вдалося отримати список моделей через API: {e}")
+        return ["gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
 
 
 def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
@@ -57,8 +71,7 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
         2. Кілька кольорових емодзі у заголовку та тексті.
         3. 2-3 цікаві новини/факти.
         4. Обов'язкове запитання в кінці для підписників.
-        5. Не використовуй складену розмітку Markdown, яка ламає Telegram. Простий текст з емодзі.
-        6. До 1200 символів.
+        5. До 1200 символів.
         """
     else:
         prompt = f"""
@@ -74,15 +87,20 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
         2. Яскравий заголовок з емодзі.
         3. Основні новини у вигляді списку (Bullet Points).
         4. Короткий висновок або головна думка дня.
-        5. Простий текст з емодзі, до 1500 символів.
+        5. До 1500 символів.
         """
 
-    # Список моделей для надійного виклику
-    candidate_models = ["gemini-2.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash"]
-    
+    # Динамічно отримуємо список доступних моделей для даного акаунта
+    models_to_try = get_available_gemini_models()
+    print(f"ℹ️ Доступні моделі для вашого API ключа: {models_to_try}")
+
     last_error = None
-    for model_name in candidate_models:
+    for model_name in models_to_try:
+        # Пропускаємо спеціальні ембеддінг-моделі
+        if "embed" in model_name or "imagen" in model_name or "text-embedding" in model_name:
+            continue
         try:
+            print(f"🤖 Пробуємо згенерувати пост моделлю: {model_name}...")
             response = ai_client.models.generate_content(
                 model=model_name,
                 contents=prompt,
@@ -90,10 +108,11 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
             if response and response.text:
                 return response.text
         except Exception as e:
+            print(f"⚠️ Модель {model_name} повернула помилку: {e}")
             last_error = e
             continue
 
-    raise Exception(f"Не вдалося згенерувати пост жодною з моделей. Помилка: {last_error}")
+    raise Exception(f"Не вдалося згенерувати пост жодною з доступних моделей. Останнє повідомлення: {last_error}")
 
 
 async def run():
