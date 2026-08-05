@@ -1,0 +1,33 @@
+name: Daily IT & AI News Posting
+
+on:
+  schedule:
+    # Запуск щодня о 06:00 UTC (тобто о 09:00 за київським часом)
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Дозволяє вручну запускати бот через інтерфейс GitHub
+
+jobs:
+  post-news:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Telegram Bot Script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL_KIDS_ID: ${{ secrets.CHANNEL_KIDS_ID }}
+          CHANNEL_ADULTS_ID: ${{ secrets.CHANNEL_ADULTS_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
