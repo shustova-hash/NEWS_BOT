@@ -55,9 +55,9 @@ def generate_post_with_gemini(audience_type: str) -> str:
         6. Обсяг: до 1500 символів.
         """
 
-    # Модель Gemini 2.5 Flash із пошуковим заземленням (Google Search Grounding)
+    # Модель Gemini 2.0 Flash із пошуковим заземленням (Google Search Grounding)
     response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             tools=[{"google_search": {}}],
