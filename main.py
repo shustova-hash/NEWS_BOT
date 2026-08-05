@@ -55,9 +55,9 @@ def generate_post_with_gemini(audience_type: str) -> str:
         6. Обсяг: до 1500 символів.
         """
 
-    # Модель Gemini 2.0 Flash із пошуковим заземленням (Google Search Grounding)
+    # Модель Gemini 1.5 Flash із пошуковим заземленням (Google Search Grounding)
     response = ai_client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-1.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             tools=[{"google_search": {}}],
@@ -78,6 +78,10 @@ async def run():
         print("✅ Пост успішно опубліковано у дитячому каналі!")
     except Exception as e:
         print(f"❌ Помилка публікації у дитячий канал: {e}")
+
+    # Затримка 15 секунд для дотримання лімітів безкоштовного тарифу (Free Tier)
+    print("⏳ Пауза 15 секунд для дотримання лімітів API...")
+    await asyncio.sleep(15)
 
     # 2. Пост для дорослих (Канал №2)
     try:
