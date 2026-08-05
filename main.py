@@ -90,41 +90,51 @@ def generate_post_with_gemini(news_text: str, audience_type: str) -> str:
         5. До 1500 символів.
         """
 
-    # Динамічно отримуємо список доступних моделей для даного акаунта
-    models_to_try = get_available_gemini_models()
-    print(f"ℹ️ Доступні моделі для вашого API ключа: {models_to_try}")
+    # Список найбільш стабільних та робочих моделей для даного ключа
+    preferred_models = [
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-pro-latest"
+    ]
+    
+    # Спочатку пробуємо рекомендовані робочі моделі
+    all_models = preferred_models + [m for m in get_available_gemini_models() if m not in preferred_models]
 
     last_error = None
-    for model_name in models_to_try:
-        # Пропускаємо спеціальні ембеддінг-моделі
-        if "embed" in model_name or "imagen" in model_name or "text-embedding" in model_name:
+    for model_name in all_models:
+        # Пропускаємо аудіо, ембеддінг та відео моделі
+        if any(bad in model_name for bad in ["embed", "imagen", "veo", "audio", "tts", "2.5-flash"]):
             continue
         try:
-            print(f"🤖 Пробуємо згенерувати пост моделлю: {model_name}...")
+            print(f"🤖 Звертаємося до Gemini моделі: {model_name}...")
             response = ai_client.models.generate_content(
                 model=model_name,
                 contents=prompt,
             )
             if response and response.text:
+                print(f"✨ Пост успішно згенеровано моделлю {model_name}!")
                 return response.text
         except Exception as e:
-            print(f"⚠️ Модель {model_name} повернула помилку: {e}")
             last_error = e
             continue
 
-    raise Exception(f"Не вдалося згенерувати пост жодною з доступних моделей. Останнє повідомлення: {last_error}")
+    raise Exception(f"Не вдалося згенерувати пост жодною з моделей. Останнє повідомлення: {last_error}")
 
 
 async def run():
     print("⏳ Розпочато процес збору новин та генерації постів...")
+    print(f"📌 Налаштовані канали: Kids = '{CHANNEL_KIDS_ID}', Adults = '{CHANNEL_ADULTS_ID}'")
 
     # 1. Пост для дітей (Канал №1)
     try:
         print("👶 Шукаємо новини та генеруємо пост для дітей (7-14 років)...")
         kids_news = fetch_web_news("artificial intelligence technology gaming news for kids")
         kids_post = generate_post_with_gemini(kids_news, "kids")
+        print(f"📤 Відправляємо пост у дитячу групу ({CHANNEL_KIDS_ID})...")
         await bot.send_message(chat_id=CHANNEL_KIDS_ID, text=kids_post)
-        print("✅ Пост успішно опубліковано у дитячому каналі!")
+        print("✅ Пост успішно опубліковано у дитячій групі!")
     except Exception as e:
         print(f"❌ Помилка публікації у дитячий канал: {e}")
 
@@ -135,8 +145,9 @@ async def run():
         print("👨‍💼 Шукаємо новини та генеруємо пост для дорослих...")
         adults_news = fetch_web_news("IT artificial intelligence tech business news")
         adults_post = generate_post_with_gemini(adults_news, "adults")
+        print(f"📤 Відправляємо пост у дорослу групу ({CHANNEL_ADULTS_ID})...")
         await bot.send_message(chat_id=CHANNEL_ADULTS_ID, text=adults_post)
-        print("✅ Пост успішно опубліковано у дорослому каналі!")
+        print("✅ Пост успішно опубліковано у дорослій групі!")
     except Exception as e:
         print(f"❌ Помилка публікації у дорослий канал: {e}")
 
